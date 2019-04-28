@@ -11,79 +11,179 @@ namespace Module\Controllers;
 use \Firebase\JWT\JWT;
 use Symfony\Component\HttpFoundation\Request;
 use Lib\Database\DB;
+use Lib\Validation\validation;
 
 
 class userController
 {
 
-    public function createToken() {
+    public $db;
+    public $publicKey;
+    public $privateKey;
 
-        $privateKey = <<<EOD
------BEGIN RSA PRIVATE KEY-----
-MIICXAIBAAKBgQC8kGa1pSjbSYZVebtTRBLxBz5H4i2p/llLCrEeQhta5kaQu/Rn
-vuER4W8oDH3+3iuIYW4VQAzyqFpwuzjkDI+17t5t0tyazyZ8JXw+KgXTxldMPEL9
-5+qVhgXvwtihXC1c5oGbRlEDvDF6Sa53rcFVsYJ4ehde/zUxo6UvS7UrBQIDAQAB
-AoGAb/MXV46XxCFRxNuB8LyAtmLDgi/xRnTAlMHjSACddwkyKem8//8eZtw9fzxz
-bWZ/1/doQOuHBGYZU8aDzzj59FZ78dyzNFoF91hbvZKkg+6wGyd/LrGVEB+Xre0J
-Nil0GReM2AHDNZUYRv+HYJPIOrB0CRczLQsgFJ8K6aAD6F0CQQDzbpjYdx10qgK1
-cP59UHiHjPZYC0loEsk7s+hUmT3QHerAQJMZWC11Qrn2N+ybwwNblDKv+s5qgMQ5
-5tNoQ9IfAkEAxkyffU6ythpg/H0Ixe1I2rd0GbF05biIzO/i77Det3n4YsJVlDck
-ZkcvY3SK2iRIL4c9yY6hlIhs+K9wXTtGWwJBAO9Dskl48mO7woPR9uD22jDpNSwe
-k90OMepTjzSvlhjbfuPN1IdhqvSJTDychRwn1kIJ7LQZgQ8fVz9OCFZ/6qMCQGOb
-qaGwHmUK6xzpUbbacnYrIM6nLSkXgOAwv7XXCojvY614ILTK3iXiLBOxPu5Eu13k
-eUz9sHyD6vkgZzjtxXECQAkp4Xerf5TGfQXGXhxIX52yH+N2LtujCdkQZjXAsGdm
-B2zNzvrlgRmgBrklMTrMYgm1NPcW+bRLGcwgW2PTvNM=
------END RSA PRIVATE KEY-----
-EOD;
+    public function __construct(DB $db,$publicKey = null,$privateKey = null)
+    {
+        $this->db = $db;
+        $this->publicKey = $publicKey;
+        $this->privateKey = $privateKey;
+    }
+
+    /*
+     * user register
+     */
+    public function register(Request $request) {
+
+        // get token from request header
+        $token = $request->headers->get('auth-token');
+
+        // decode token
+        $decodedArray = (array) JWT::decode($token, $this->publicKey, array('RS256'));
+
+        // get real ip from request
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            $ip = $_SERVER['HTTP_CLIENT_IP'];
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'];
+        }
+
+        // -------------- validation --------------
+        $validate = validation::run($decodedArray['data'],[
+            'email' => 'notEmpty',
+            'mobile' => 'notEmpty',
+            'password' => 'notEmpty',
+            'password' => ['min','6'],
+            'confirm_password' => ['confirm_password',$decodedArray['data']->password],
+        ]);
+
+        if(!empty($validate)) {
+
+            echo json_encode([
+                'status ' => 'validation error',
+                'message' => $validate
+            ]);die;
+        }
+        // --------------- validation ----------------
+
+        // check one user with this email or mobile exist or not
+        $result = $this->db->select('name, email','users')
+            ->where('email = :email OR mobile = :mobile')
+            ->getQuery()
+            ->params(':email', $decodedArray['data']->email)
+            ->params(':mobile', $decodedArray['data']->mobile)
+            ->execution(\PDO::FETCH_ASSOC)
+            ->fAll();
+
+        if(empty($result)) {
+
+            $this->db->insert('name, email, mobile, password, ip','users', ':name, :email, :mobile, :password, :ip')
+            ->getQuery()
+            ->params(':name', $decodedArray['data']->name)
+            ->params(':email', $decodedArray['data']->email)
+            ->params(':mobile', $decodedArray['data']->mobile)
+            ->params(':password', md5($decodedArray['data']->password))
+            ->params(':ip', $ip)
+            ->execution();
+
+            $response = [
+                'status' => true,
+                'message' => 'user registered successfully'
+            ];
+        }
+        else {
+            error_log('user registered before - ' . date('Y-m-d H:i:s'), 3, '/var/www/blog/log.txt');
+            $response = [
+                'status' => false,
+                'message' => 'user registered before'
+            ];
+        }
+
+        echo json_encode($response);die;
+
+    }
+
+    /*
+     * user login
+     */
+    public function login(Request $request) {
+
+        // get token from request header
+        $token = $request->headers->get('auth-token');
+
+        // decode token
+        $decodedArray = (array) JWT::decode($token, $this->publicKey, array('RS256'));
+
+        // ------------------- validation ------------------
+        $validate = validation::run($decodedArray['data'],[
+            'email' => 'notEmpty',
+            'password' => 'notEmpty',
+        ]);
+
+        if(!empty($validate)) {
+
+            echo json_encode([
+                'status ' => 'validation error',
+                'message' => $validate
+            ]);die;
+        }
+        // -------------------- validation -----------------
+
+        // check user exist or not
+        $result = $this->db->select('*','users')
+            ->where('email = :email AND password = :password')
+            ->getQuery()
+            ->params(':email', $decodedArray['data']->email)
+            ->params(':password', md5($decodedArray['data']->password))
+            ->execution(\PDO::FETCH_ASSOC)
+            ->fAll();
+
+        if(empty($result)) {
+
+            error_log('email or password incorrect.try again Please - ' . date('Y-m-d H:i:s'), 3, '/var/www/blog/log.txt');
+            $response = [
+                'status' => false,
+                'message' => 'email or password incorrect.try again Please'
+            ];
+        }
+        else {
+
+            $response = [
+                'status' => true,
+                'message' => 'login successfully'
+            ];
+        }
+
+        echo json_encode($response);die;
+
+    }
+
+    /*
+     * create token for test
+     */
+    public function createToken() {
 
         $issuedAt   = time();
         $notBefore  = $issuedAt + 10;             //Adding 10 seconds
-        $expire     = $notBefore + 60;            // Adding 60 seconds
+        $expire     = $notBefore + 600;            // Adding 60 seconds
         $serverName = 'http://localhost:8080';    // Retrieve the server name from config file
 
         $token = array(
             "iss" => $serverName,
             "aud" => $serverName,
             'iat'  => $issuedAt,         // Issued at: time when the token was generated
-//            'nbf'  => $notBefore,        // Not before
+//            'nbf'  => $notBefore,      // Not before
             'exp'  => $expire,           // Expire
             'data' => [                  // Data related to the signer user
-                'username' => 'saeed',
-                'email' => 'saeedadabi72@gmail.com',
-                'mobile' => '09339635147',
-                'password' => '123456',
-                'ip' => '127.0.0.1',
+//                'name' => 'reza',
+                'email' => 'reza@gmail.com',
+//                'mobile' => '09339635143',
+                'password' => '12345',
+//                'confirm_password' => '123456',
             ]
         );
 
-        $jwt = JWT::encode($token, $privateKey, 'RS256');
+        $jwt = JWT::encode($token, $this->privateKey, 'RS256');
         echo "Encode:\n" . print_r($jwt, true) . "\n";
-    }
-
-    public function register(Request $request) {
-//echo 'rrrr';die;
-$db = new DB();
-$db->getInstance();
-        $publicKey = <<<EOD
------BEGIN PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC8kGa1pSjbSYZVebtTRBLxBz5H
-4i2p/llLCrEeQhta5kaQu/RnvuER4W8oDH3+3iuIYW4VQAzyqFpwuzjkDI+17t5t
-0tyazyZ8JXw+KgXTxldMPEL95+qVhgXvwtihXC1c5oGbRlEDvDF6Sa53rcFVsYJ4
-ehde/zUxo6UvS7UrBQIDAQAB
------END PUBLIC KEY-----
-EOD;
-
-        $jwt = $request->headers->get('auth-token');
-
-        $decoded = JWT::decode($jwt, $publicKey, array('RS256'));
-
-        $decoded_array = (array) $decoded;
-        echo "Decode:\n" . print_r($decoded_array, true) . "\n";
-
-    }
-
-    public function login() {
-
-
     }
 }
