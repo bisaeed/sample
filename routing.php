@@ -14,14 +14,20 @@ $uri = $request->getPathInfo();
 $method = $request->getMethod();
 
 
-if('/register' === $uri && $method === 'GET') {
+if('/register' === $uri && $method === 'POST') {
 
-    $action = new Module\Controllers\userController();
+    $action = new Module\Controllers\userController($db,$publicKey);
     $action->register($request);
+}
+
+if('/login' === $uri && $method === 'POST') {
+
+    $action = new Module\Controllers\userController($db,$publicKey);
+    $action->login($request);
 }
 
 if('/token/create' === $uri && $method === 'GET') {
 
-    $action = new Module\Controllers\userController();
+    $action = new Module\Controllers\userController($db,'',$privateKey);
     $action->createToken();
 }
