@@ -12,20 +12,20 @@ use \Firebase\JWT\JWT;
 use Symfony\Component\HttpFoundation\Request;
 use Lib\Database\DB;
 use Lib\Validation\validation;
-
+use Lib\Auth\Auth;
 
 class userController
 {
 
     public $db;
-    public $publicKey;
-    public $privateKey;
+    public $key;
+    public $secretKey;
 
-    public function __construct(DB $db,$publicKey = null,$privateKey = null)
+    public function __construct(DB $db,$key = null, $secretKey = null)
     {
         $this->db = $db;
-        $this->publicKey = $publicKey;
-        $this->privateKey = $privateKey;
+        $this->key = $key;
+        $this->secretKey = $secretKey;
     }
 
     /*
@@ -178,9 +178,23 @@ class userController
             ]
         );
 
-        $jwt = JWT::encode($token, $this->privateKey, 'HS256');
+        $jwt = JWT::encode($token, $this->key, 'HS256');
 
         return $jwt;
-//        echo $jwt;
+
+    }
+
+    public function create(Request $request) {
+
+        $token = $request->headers->get('auth-token');
+
+        if(Auth::isLogin($token, $this->key)) {
+
+
+        }
+        else {
+
+        }
+
     }
 }
