@@ -33,11 +33,8 @@ class userController
      */
     public function register(Request $request) {
 
-        // get token from request header
-        $token = $request->headers->get('auth-token');
-
-        // decode token
-        $decodedArray = (array) JWT::decode($token, $this->publicKey, array('RS256'));
+        // get user information
+        $user = (object) $request->request->all();
 
         // get real ip from request
         if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
@@ -49,12 +46,12 @@ class userController
         }
 
         // -------------- validation --------------
-        $validate = validation::run($decodedArray['data'],[
+        $validate = validation::run($user,[
             'email' => 'notEmpty',
             'mobile' => 'notEmpty',
             'password' => 'notEmpty',
             'password' => ['min','6'],
-            'confirm_password' => ['confirm_password',$decodedArray['data']->password],
+            'confirm_password' => ['confirm_password',$user->password],
         ]);
 
         if(!empty($validate)) {
@@ -70,8 +67,8 @@ class userController
         $result = $this->db->select('name, email','users')
             ->where('email = :email OR mobile = :mobile')
             ->getQuery()
-            ->params(':email', $decodedArray['data']->email)
-            ->params(':mobile', $decodedArray['data']->mobile)
+            ->params(':email', $user->email)
+            ->params(':mobile', $user->mobile)
             ->execution(\PDO::FETCH_ASSOC)
             ->fAll();
 
@@ -79,10 +76,10 @@ class userController
 
             $this->db->insert('name, email, mobile, password, ip','users', ':name, :email, :mobile, :password, :ip')
             ->getQuery()
-            ->params(':name', $decodedArray['data']->name)
-            ->params(':email', $decodedArray['data']->email)
-            ->params(':mobile', $decodedArray['data']->mobile)
-            ->params(':password', md5($decodedArray['data']->password))
+            ->params(':name', $user->name)
+            ->params(':email', $user->email)
+            ->params(':mobile', $user->mobile)
+            ->params(':password', md5($user->password))
             ->params(':ip', $ip)
             ->execution();
 
@@ -108,14 +105,11 @@ class userController
      */
     public function login(Request $request) {
 
-        // get token from request header
-        $token = $request->headers->get('auth-token');
-
-        // decode token
-        $decodedArray = (array) JWT::decode($token, $this->publicKey, array('RS256'));
+        // get user information
+        $user = (object) $request->request->all();
 
         // ------------------- validation ------------------
-        $validate = validation::run($decodedArray['data'],[
+        $validate = validation::run($user,[
             'email' => 'notEmpty',
             'password' => 'notEmpty',
         ]);
@@ -133,8 +127,8 @@ class userController
         $result = $this->db->select('*','users')
             ->where('email = :email AND password = :password')
             ->getQuery()
-            ->params(':email', $decodedArray['data']->email)
-            ->params(':password', md5($decodedArray['data']->password))
+            ->params(':email', $user->email)
+            ->params(':password', md5($user->password))
             ->execution(\PDO::FETCH_ASSOC)
             ->fAll();
 
@@ -148,9 +142,12 @@ class userController
         }
         else {
 
+            $object = (object) $result[0];
+
             $response = [
                 'status' => true,
-                'message' => 'login successfully'
+                'message' => 'login successfully',
+                'token' => $this->createToken($object)
             ];
         }
 
@@ -161,7 +158,7 @@ class userController
     /*
      * create token for test
      */
-    public function createToken() {
+    public function createToken($data) {
 
         $issuedAt   = time();
         $notBefore  = $issuedAt + 10;             //Adding 10 seconds
@@ -175,15 +172,15 @@ class userController
 //            'nbf'  => $notBefore,      // Not before
             'exp'  => $expire,           // Expire
             'data' => [                  // Data related to the signer user
-//                'name' => 'reza',
-                'email' => 'reza@gmail.com',
-//                'mobile' => '09339635143',
-                'password' => '12345',
-//                'confirm_password' => '123456',
+                'name' => $data->name,
+                'email' => $data->email,
+                'mobile' => $data->mobile,
             ]
         );
 
-        $jwt = JWT::encode($token, $this->privateKey, 'RS256');
-        echo "Encode:\n" . print_r($jwt, true) . "\n";
+        $jwt = JWT::encode($token, $this->privateKey, 'HS256');
+
+        return $jwt;
+//        echo $jwt;
     }
 }
