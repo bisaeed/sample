@@ -26,8 +26,8 @@ if('/login' === $uri && $method === 'POST') {
     $action->login($request);
 }
 
-if('/token/create' === $uri && $method === 'GET') {
-
-    $action = new Module\Controllers\userController($db,'',$privateKey);
-    $action->createToken();
-}
+//if('/token/create' === $uri && $method === 'GET') {
+//
+//    $action = new Module\Controllers\userController($db,'',$privateKey);
+//    $action->createToken();
+//}
