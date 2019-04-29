@@ -90,11 +90,19 @@ class DB extends PDO
     }
 
     /*
+     * fetch one result from executed query
+     */
+    public function fOne() {
+
+        return self::$stmt->fetch();
+    }
+
+    /*
      * get db instance
      */
-    public function getDB() {
+    public static function getDB() {
 
-        return self::$conn;
+        return new static;
     }
 
     /*
@@ -113,5 +121,29 @@ class DB extends PDO
     public function getInsertedId() {
 
         return self::$conn->lastInsertId();
+    }
+
+    /*
+     * update query
+     */
+    public function update($table, $columns) {
+
+        self::$query = "UPDATE " . $table . " SET " . $columns;
+        return $this;
+    }
+
+    public function rowUpdatedCount() {
+
+        return self::$stmt->rowCount();
+    }
+
+    /*
+    * select query
+    */
+    public function delete($table) {
+
+        self::$query = "DELETE FROM " . $table;
+        return $this;
+
     }
 }
