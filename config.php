@@ -32,3 +32,7 @@ eUz9sHyD6vkgZzjtxXECQAkp4Xerf5TGfQXGXhxIX52yH+N2LtujCdkQZjXAsGdm
 B2zNzvrlgRmgBrklMTrMYgm1NPcW+bRLGcwgW2PTvNM=
 -----END RSA PRIVATE KEY-----
 EOD;
+
+$key = "test";
+
+$secretKey = base64_decode($key);
