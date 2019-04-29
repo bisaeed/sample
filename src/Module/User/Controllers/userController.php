@@ -6,7 +6,7 @@
  * Time: 12:11
  */
 
-namespace Module\Controllers;
+namespace Module\User\Controllers;
 
 use \Firebase\JWT\JWT;
 use Symfony\Component\HttpFoundation\Request;
@@ -89,7 +89,9 @@ class userController
             ];
         }
         else {
-            error_log('user registered before - ' . date('Y-m-d H:i:s'), 3, '/var/www/blog/log.txt');
+            // log
+            error_log('userController::register - user registered before - ' . date('Y-m-d H:i:s'), 3, '/var/www/blog/log.txt');
+
             $response = [
                 'status' => false,
                 'message' => 'user registered before'
@@ -134,7 +136,9 @@ class userController
 
         if(empty($result)) {
 
-            error_log('email or password incorrect.try again Please - ' . date('Y-m-d H:i:s'), 3, '/var/www/blog/log.txt');
+            // log
+            error_log('userController::login - email or password incorrect.try again Please - ' . date('Y-m-d H:i:s'), 3, '/var/www/blog/log.txt');
+
             $response = [
                 'status' => false,
                 'message' => 'email or password incorrect.try again Please'
@@ -184,17 +188,5 @@ class userController
 
     }
 
-    public function create(Request $request) {
 
-        $token = $request->headers->get('auth-token');
-
-        if(Auth::isLogin($token, $this->key)) {
-
-
-        }
-        else {
-
-        }
-
-    }
 }
